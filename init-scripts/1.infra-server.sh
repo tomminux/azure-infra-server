@@ -41,7 +41,7 @@ sudo apt autoremove
 ## ..:: Base system and networking configuration ::..
 ## ----------------------------------------------------------------------------
 
-sudo sh -c 'echo "infra-server" > /etc/hostname'
+sudo sh -c 'echo "az-infra-server" > /etc/hostname'
 
 cat <<EOF > rc.local
 #!/bin/bash
