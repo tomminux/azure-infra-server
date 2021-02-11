@@ -45,7 +45,7 @@ sudo sh -c 'echo "infra-server" > /etc/hostname'
 
 cat <<EOF > rc.local
 #!/bin/bash
-ifconfig eth0:30 10.1.20.30/24 up
+ifconfig eth0:30 10.160.20.30/24 up
 
 ## ..:: Max Map Count for VM when runnign ELK in a Docker container ::..
 sysctl -w vm.max_map_count=262144
@@ -56,6 +56,7 @@ EOF
 sudo chown root:root rc.local
 sudo mv rc.local /etc/.
 sudo chmod 755 /etc/rc.local
+sudo /etc/rc.local
 
 sudo apt install -y apt-transport-https ca-certificates curl software-properties-common 
 
@@ -89,3 +90,6 @@ alias kdvs='kubectl describe vs'
 
 alias 3k9s='k9s --kubeconfig /home/ubuntu/.kube/config-k3s -A'
 alias 8k9s='k9s --kubeconfig /home/ubuntu/.kube/config-k8s -A'
+EOF
+
+sudo reboot
