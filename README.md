@@ -1,44 +1,25 @@
 # Usage
 
-## ..:: f5-udf-infra-server ::..
+## ..:: azure-infra-server ::..
 Bash scripts and Ansible playbook to automate the creation of a Infrastructure Server in F5 UDF Environment
 
-Create two more networks in UDF
-- External 10.1.10.0/24
-- Internal 10.1.20.0/24
+Connect to az-infra-server with user buntu 
 
-Create a Linux Ubuntu 18.04 Server VM with 8 vCPU, 15 GB of RAM (c4.2xLarge) and 100GB HD
+    git clone https://github.com/tomminux/azure-infra-server.git
 
-Bind the second network interface to Network Internal with the following published addresses:
-- 10.1.20.20
-- 10.1.20.30
-
-start it and onnect to it 
-
-    git clone https://github.com/tomminux/f5-udf-infra-server.git
-
-    cd f5-udf-infra-server/
+    cd azure-infra-server/
     bash init-scripts/1.infra-server.sh 
 
-    cd f5-udf-infra-server/
-    bash init-scripts/2.infra-server-postReboot.sh
-
-    cd ~/f5-udf-infra-server/ansible/playbooks/files/docker-files/
+    cd ~/azure-infra-server/ansible/playbooks/files/docker-files/
     openssl req -newkey rsa:4096 -nodes -sha256 -keyout registry.key -x509 -days 3650 -out registry.crt
 
-Edit the host inventory file
+Check the host inventory file
 
     vim ~/f5-udf-infra-server/ansible/inventory/hosts
 
-to define variables for your environment nad verify bigip-security internal self-ip address:
-
-    secondNetIf_name
-    secondNetIf_ip
-    bgp_peer_self_ip (this is the internal self-ip address)
-
 We are now ready to execute the Ansible Playbook to configure everything we need:
 
-    cd ~/f5-udf-infra-server/ansible
+    cd ~/azure-infra-server/ansible
     ansible-playbook playbooks/infra-server.yaml
 
 Once the playbook is finishied installing and configuring, please remember to logout and log in again to infra-server using ssh
