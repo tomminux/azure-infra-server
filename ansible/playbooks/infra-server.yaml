@@ -1,0 +1,401 @@
+## ----------------------------------------------------------------------------
+## ..:: infra-server installation ::..
+## ----------------------------------------------------------------------------
+
+- hosts: infra-server
+  remote_user: root
+  tasks:
+
+    - name: Upgrading all packages to the latest version
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Copy hosts file
+      copy:
+        src: hosts
+        dest: /etc/hosts
+
+    - name: Set timezone to Europe/Rome
+      timezone:
+        name: Europe/Rome
+
+    ## Installing a bunch of needed software
+    ## ------------------------------------- 
+    - name: Installing needed software
+      apt:
+        pkg:
+        - apt-transport-https 
+        - ca-certificates 
+        - curl 
+        - software-properties-common
+        - python3-pip
+        - build-essential
+        - nfs-server
+
+    ## Installing ..:: Docker CE ::..
+    ## ------------------------------
+    - name: adding Docker apt-key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: adding Docker's APT repository
+      apt_repository:
+       repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+       state: present
+       filename: 'docker-ce'
+
+    - name: installing docker-ce
+      apt:
+        name: docker-ce
+        state: present
+        update_cache: true
+    
+    - name: Adding ububtu user to docker group
+      command: usermod -aG docker ubuntu
+
+    - name: Configure Docker to use a self signed certificate with local Registry
+      lineinfile: 
+        dest: /lib/systemd/system/docker.service
+        regexp: '^ExecStart' 
+        line: 'ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --insecure-registry registry.multicloud-demo.com:5000'
+        backrefs: yes
+
+    - name: Restart service Docker - Reload files
+      command: systemctl daemon-reload
+
+    - name: Restart service Docker
+      service:
+        name: docker
+        state: restarted
+
+    ## Installing Kubernetes' ..:: kubectl ::.. command
+    ## ------------------------------------------------ 
+    - name: adding Kubernetes apt-key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: adding Kubernetes' APT repository
+      apt_repository:
+       repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+       state: present
+       filename: 'kubernetes'
+
+    - name: installing kubectl
+      apt:
+        name: kubectl
+        state: present
+        update_cache: true
+
+    ## Preparing for dockers execution - ..:: dockerhost-files ::... file structure
+    ## ----------------------------------------------------------------------------
+
+    ## REGISTRY
+    - name: Registry Docker storage configuration - ca-certificates
+      file:
+        path: /home/ubuntu/dockerhost-storage/registry/ca-certificates
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Registry Docker storage configuration - var-lib-registry
+      file:
+        path: /home/ubuntu/dockerhost-storage/registry/var-lib-registry
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copying registry certificate and key
+      copy:
+        src: docker-files/registry.{{ item }}
+        dest: /home/ubuntu/dockerhost-storage/registry/ca-certificates/
+        owner: ubuntu
+        group: ubuntu
+      with_items:
+        - key
+        - crt
+    
+    ## F5-CLI
+    - name: F5 CLI Docker storage configuration - f5-cli
+      file:
+        path: /home/ubuntu/dockerhost-storage/f5-cli/f5-cli/{{ item }}
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+      with_items:
+        - do
+        - as3
+        - ts
+
+    - name: Copying do onboarding file for BIG-IP CIS
+      copy:
+        src: bigip-automation-files/bigip-cis-do.json
+        dest: /home/ubuntu/dockerhost-storage/f5-cli/f5-cli/do
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: F5 CLI Docker storage configuration - .f5_cli
+      file:
+        path: /home/ubuntu/dockerhost-storage/f5-cli/.f5_cli
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Creating alias runf5cli
+      lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: alias runf5cli='docker run --rm -it -v /home/ubuntu/dockerhost-storage/f5-cli/.f5_cli:/root/.f5_cli -v /home/ubuntu/dockerhost-storage/f5-cli/f5-cli/:/f5-cli f5devcentral/f5-cli:latest'
+
+    ## DOCKER HOST DIRECTORY TO HOST K3S PERSISTENT FILES
+    - name: gitlab Docker storage configuration
+      file:
+        path: /home/ubuntu/dockerhost-storage/gitlab
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+    
+    - name: prometheus Docker storage configuration
+      file:
+        path: /home/ubuntu/dockerhost-storage/prometheus/{{ item }}
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+      with_items:
+        - config
+        - data
+
+    - name: Copying prometheus config file
+      copy:
+        src: prometheus.yml
+        dest: /home/ubuntu/dockerhost-storage/prometheus/config
+        owner: ubuntu
+        group: ubuntu
+
+    - name: grafana Docker storage configuration
+      file:
+        path: /home/ubuntu/dockerhost-storage/grafana
+        state: directory
+        owner: 472
+        group: 472
+
+    ## ELK
+    - name: ELK Docker storage configuration
+      file:
+        path: /home/ubuntu/dockerhost-storage/elk/{{ item }}
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+      with_items:
+        - logstash
+        - logstash/conf.d
+        - elasticsearch
+
+    - name: Copying ELK Logstash configuration file
+      copy:
+        src: docker-files/30-waf-logs-full-logstash.conf
+        dest: /home/ubuntu/dockerhost-storage/elk/logstash/conf.d/
+        owner: ubuntu
+        group: ubuntu
+  
+    ## DOCKER STARTUP FILE
+    - name: Copying Docker startup file on ubuntu home dir 
+      copy:
+        src: docker-files/startInfraServerDockers.sh
+        dest: /home/ubuntu/startInfraServerDockers.sh
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    ## TELEGRAF
+    - name: Adding influx apt-key
+      apt_key:
+        url: https://repos.influxdata.com/influxdb.key
+        state: present
+
+    - name: Adding Influx apt reporisotries
+      shell: echo "deb https://repos.influxdata.com/ubuntu `lsb_release -cs` stable\n" > /etc/apt/sources.list.d/influxdb.list
+
+    - name: Upgrading all packages to the latest version
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Installing Telegraf
+      apt:
+        pkg:
+        - telegraf
+
+    - name: Copying Telegraf configuration file
+      template:
+        src: telegraf.conf.j2
+        dest: /etc/telegraf/telegraf.conf
+
+    ## Staring Telegraf Agent
+    - name: Restarting Telegraf agent
+      service:
+        name: telegraf
+        state: restarted
+
+    ## Installing k9s
+    - name: Downloading -brew- installation file 
+      get_url:
+        url: https://raw.githubusercontent.com/Homebrew/install/master/install.sh
+        dest: /home/ubuntu/install-k9s.sh
+        mode: '0755'
+
+    - name: Installing -brew-
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "echo'y' | /home/ubuntu/install-k9s.sh"
+      args: 
+         chdir: /home/ubuntu/
+
+    - name: Adding -brew- bin dir to PATH
+      lineinfile:
+        path: /home/ubuntu/.profile
+        line: PATH="$PATH:/home/linuxbrew/.linuxbrew/bin"
+
+    - name: Installing k9s through Brew Package manager
+      become: true
+      become_user: ubuntu
+      homebrew:
+        name: derailed/k9s/k9s
+        state: present
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/linuxbrew/.linuxbrew/bin"
+
+    ## Starting Docker Containers
+    - name: Starting Docker Containers
+      become: yes
+      become_user: ubuntu
+      command: /home/ubuntu/startInfraServerDockers.sh
+
+    ## Installing K3s
+    - name: Installing -k3s-
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c 'curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--cluster-cidr=10.243.0.0/16 --disable-network-policy --disable=traefik" sh -'
+      args: 
+         chdir: /home/ubuntu/
+
+    - name: Creating .kube directory for ubuntu
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Creating config-k3s file for ubuntu to access k3s on infra
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config"
+
+    - name: Creating config-k3s file for ubuntu to access k3s on infra
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config-k3s"
+
+    # ## Installing CALICO Overlay network 
+    # - name: Downloading -Calico- Manifest file
+    #   get_url:
+    #     url: https://docs.projectcalico.org/manifests/calico.yaml
+    #     dest: /home/ubuntu/calico-k3s.yaml
+    #     mode: '0644'
+
+    # - name: Configure Calico to use 10.243.0.0 POD Network - Step 1
+    #   lineinfile: 
+    #     dest: /home/ubuntu/calico-k3s.yaml
+    #     regexp: 'CALICO_IPV4POOL_CIDR' 
+    #     line: '            - name: CALICO_IPV4POOL_CIDR'
+    #     backrefs: yes
+
+    # - name: Configure Calico to use 10.243.0.0 POD Network - Step 2
+    #   lineinfile: 
+    #     dest: /home/ubuntu/calico-k3s.yaml
+    #     regexp: '192.168.0.0/16' 
+    #     line: '              value: "10.243.0.0/16"'
+    #     backrefs: yes
+
+    # - name: Apply Calico Overlay Networking Configuration
+    #   become: true
+    #   become_user: ubuntu
+    #   command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/calico-k3s.yaml"
+
+    # ## Configuring CALICO for BGP with BIG-IP
+    # - name: Creating /etc/calico directory
+    #   file:
+    #     path: /etc/calico
+    #     state: directory
+
+    # - name: Downloading calicoctl executable installation file 
+    #   get_url:
+    #     url: https://github.com/projectcalico/calicoctl/releases/download/v3.17.1/calicoctl
+    #     dest: /usr/local/bin
+    #     mode: '0755'
+ 
+    # - name: Copy calico configuration files  
+    #   copy:
+    #     src: k3s-manifests/calico-overlay/{{ item }}
+    #     dest: /etc/calico/
+    #   with_items:
+    #     - calicoctl-k3s.cfg
+    #     - bgpConfiguration-k3s.yaml
+
+    # - name: Copying BIGIP BGP Peer configuration file
+    #   template:
+    #     src: bigipPeerConfiguration-k3s.yaml.j2
+    #     dest: /etc/calico/bigipPeerConfiguration-k3s.yaml
+
+    # - name: Configuring Calico BGP on k3s cluster
+    #   become: yes
+    #   become_user: ubuntu
+    #   command: calicoctl create -c /etc/calico/calicoctl-k3s.cfg  -f /etc/calico/bgpConfiguration-k3s.yaml
+
+    # - name: Adding BGIP bigip-security as a BGPPeer
+    #   become: yes
+    #   become_user: ubuntu
+    #   command: calicoctl create -c /etc/calico/calicoctl-k3s.cfg -f /etc/calico/bigipPeerConfiguration-k3s.yaml
+
+    - name: Copy k3s-manifests files  
+      copy:
+        src: k3s-manifests
+        dest: /home/ubuntu
+        owner: ubuntu
+        group: ubuntu
+
+    ## NFS-SERVER Configuration
+    - name: Creating directory for NFS-Server
+      file:
+        path: /home/ubuntu/dockerhost-storage/nfs-storage
+        state: directory
+        owner: nobody
+        group: nogroup
+
+    - name: Configure NFS Server to export NFS directory
+      lineinfile:
+        path: /etc/exports
+        line: /home/ubuntu/dockerhost-storage/nfs-storage    10.0.0.0/8(rw,sync,no_subtree_check,no_root_squash,no_all_squash,insecure)
+
+    - name: Restart service nfs-server
+      service:
+        name: nfs-server
+        state: restarted
+
+    ## HELM Installation
+    - name: Add the Apt signing key for Helm repository
+      ansible.builtin.apt_key:
+        url: https://baltocdn.com/helm/signing.asc
+        state: present
+
+    - name: Add Helm repository into sources list
+      ansible.builtin.apt_repository:
+        repo: deb https://baltocdn.com/helm/stable/debian/ all main
+        state: present
+
+    - name: Update repositories cache and install "helm" package
+      apt:
+        name: helm
+        update_cache: yes

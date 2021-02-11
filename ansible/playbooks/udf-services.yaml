@@ -1,0 +1,49 @@
+## ----------------------------------------------------------------------------
+## ..:: infra-server installation ::..
+## ----------------------------------------------------------------------------
+
+- hosts: infra-server
+  remote_user: root
+  tasks:
+
+    ## Configure and Deploy Services in "udf-services" namespace
+
+    - name: Creating Namepsaces
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/0.namespaces.yaml"
+
+    - name: Deploying BIGIP Controller Common k3s resources
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/1.bigip-ctlr-common.yaml"
+
+    - name: Deploying BIGIP Controller POD
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/2.bigip-ctlr-deployment.yaml"
+
+    - name: Deploying GITLAB k3s POD and Services
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/3.gitlab.yaml"
+
+    - name: Deploying GRAFANA k3s POD and Services
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/4.grafana.yaml"
+
+    - name: Deploying PROMETHEUS k3s POD and Services
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/5.prometheus.yaml"
+
+    - name: Deploying ELK k3s POD and Services
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/6.elk.yaml"
+
+    - name: Deploying BIGIP Controller ConfigMap with AS3 Payload
+      become: true
+      become_user: ubuntu
+      command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/k3s-manifests/udf-services/9.bigip-ctlr-configMap.yaml"
