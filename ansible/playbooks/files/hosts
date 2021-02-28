@@ -8,26 +8,26 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
 
-## ..:: Managament Network ::..
+## ..:: BIG-IP Managament Network ::..
 ## ----------------------------------------------------------------------------
 
-10.160.1.12     bigip-cis-mgmt.multicloud-demo.com  bigip-cis-mgmt
+10.160.1.12     bigip-cis-mgmt.az.x-wide.cloud  bigip-cis-mgmt
 
 ## ..:: Internal Network ::..
 ## ----------------------------------------------------------------------------
 
-10.160.20.20      az-infra-server.multicloud-demo.com        az-infra-server
-10.160.20.30      registry.multicloud-demo.com               registry
+10.160.20.20      az-infra-server.az.x-wide.cloud        az-infra-server
+10.160.20.20      registry.az.x-wide.cloud               registry
 
 ## ..:: External Network ::..
 ## ----------------------------------------------------------------------------
 
-10.160.10.101     hackazon.f5-udf.com
-10.160.10.101     hackazon-nap.f5-udf.com
+10.160.10.101     hackazon.az.x-wide.cloud
+10.160.10.101     hackazon-nap.az.x-wide.cloud
 
-10.160.10.201     gitlab.f5-udf.com                   gitlab
-10.160.10.202     grafana.f5-udf.com                  grafana
-10.160.10.203     prometheus.f5-udf.com               prometheus
-10.160.10.205     rancher-server.f5-udf.com           rancher-server
-10.160.10.206     prometheus-k8s.f5-udf.com           prometheus-k8s
-10.160.10.207     elk.f5-udf.com                      elk
+10.160.10.201     gitlab.az.x-wide.cloud                   gitlab
+10.160.10.202     grafana.az.x-wide.cloud                  grafana
+10.160.10.203     prometheus.az.x-wide.cloud               prometheus
+10.160.10.205     rancher-server.az.x-wide.cloud           rancher-server
+10.160.10.206     prometheus-k8s.az.x-wide.cloud           prometheus-k8s
+10.160.10.207     elk.az.x-wide.cloud                      elk

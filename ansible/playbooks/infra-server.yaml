@@ -6,6 +6,10 @@
   remote_user: root
   tasks:
 
+    - name: Set timezone to Europe/Rome
+      timezone:
+        name: Europe/Rome
+
     - name: Upgrading all packages to the latest version
       apt:
         update_cache: yes
@@ -16,9 +20,68 @@
         src: hosts
         dest: /etc/hosts
 
-    - name: Set timezone to Europe/Rome
-      timezone:
-        name: Europe/Rome
+    - name: Installing needed software
+      apt:
+        pkg:
+        - dnsmasq
+
+    - name: Starting dnsmasq
+      service:
+        name: dnsmasq
+        state: start
+
+    - name: Enabling dnsmasq at boot
+      service:
+        name: dnsmasq
+        state: enable
+
+    - name: Stopping systemd-resolved 
+      service:
+        name: systemd-resolved
+        state: stop
+
+    - name: Diabling systemd-resolved at boot
+      service:
+        name: systemd-resolved
+        state: disable
+
+    - name: Remove resolv.conf link
+      file:
+        path: /etc/resolv.conf
+        state: absent
+
+    - name: Copy resolv.conf file
+      copy:
+        src: resolv.conf
+        dest: /etc/resolv.conf
+
+    # - name: Enable rc.local
+    #   template:
+    #     src: rc.local.j2
+    #     dest: /etc/rc.local
+    #     mode: '0755'
+
+    # - name: Executing /etc/rc.local
+    #   command: /etc/rc.local
+
+    - name: Copy aliasrc.sh file to /home/ubuntu/.aliasrc
+      copy:
+        src: aliasrc.sh
+        dest: /home/ubuntu/.aliasrc
+
+    - name: Source Kubernetes aliases in .bashrc
+      ansible.builtin.lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: source /home/ubuntu/.aliasrc
+
+    - name: Reboot nginx-plus and wait for it to restart
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
 
     ## Installing a bunch of needed software
     ## ------------------------------------- 
@@ -55,12 +118,12 @@
     - name: Adding ububtu user to docker group
       command: usermod -aG docker ubuntu
 
-    - name: Configure Docker to use a self signed certificate with local Registry
-      lineinfile: 
-        dest: /lib/systemd/system/docker.service
-        regexp: '^ExecStart' 
-        line: 'ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --insecure-registry registry.multicloud-demo.com:5000'
-        backrefs: yes
+    # - name: Configure Docker to use a self signed certificate with local Registry
+    #   lineinfile: 
+    #     dest: /lib/systemd/system/docker.service
+    #     regexp: '^ExecStart' 
+    #     line: 'ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --insecure-registry registry.multicloud-demo.com:5000'
+    #     backrefs: yes
 
     - name: Restart service Docker - Reload files
       command: systemctl daemon-reload
@@ -109,7 +172,7 @@
 
     - name: Copying registry certificate and key
       copy:
-        src: docker-files/registry.{{ item }}
+        src: docker-files/registry.az.x-wide.cloud.{{ item }}
         dest: /home/ubuntu/dockerhost-storage/registry/ca-certificates/
         owner: ubuntu
         group: ubuntu
@@ -144,10 +207,10 @@
         owner: ubuntu
         group: ubuntu
 
-    - name: Creating alias runf5cli
-      lineinfile:
-        path: /home/ubuntu/.bashrc
-        line: alias runf5cli='docker run --rm -it -v /home/ubuntu/dockerhost-storage/f5-cli/.f5_cli:/root/.f5_cli -v /home/ubuntu/dockerhost-storage/f5-cli/f5-cli/:/f5-cli f5devcentral/f5-cli:latest'
+    # - name: Creating alias runf5cli
+    #   lineinfile:
+    #     path: /home/ubuntu/.bashrc
+    #     line: alias runf5cli='docker run --rm -it -v /home/ubuntu/dockerhost-storage/f5-cli/.f5_cli:/root/.f5_cli -v /home/ubuntu/dockerhost-storage/f5-cli/f5-cli/:/f5-cli f5devcentral/f5-cli:latest'
 
     ## DOCKER HOST DIRECTORY TO HOST K3S PERSISTENT FILES
     - name: gitlab Docker storage configuration
@@ -274,97 +337,36 @@
       command: /home/ubuntu/startInfraServerDockers.sh
 
     ## Installing K3s
-    - name: Installing -k3s-
-      become: true
-      become_user: ubuntu
-      command: /bin/bash -c 'curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--cluster-cidr=10.243.0.0/16 --disable-network-policy --disable=traefik" sh -'
-      args: 
-         chdir: /home/ubuntu/
-
-    - name: Creating .kube directory for ubuntu
-      file:
-        path: /home/ubuntu/.kube
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-
-    - name: Creating config-k3s file for ubuntu to access k3s on infra
-      become: true
-      become_user: ubuntu
-      command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config"
-
-    - name: Creating config-k3s file for ubuntu to access k3s on infra
-      become: true
-      become_user: ubuntu
-      command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config-k3s"
-
-    # ## Installing CALICO Overlay network 
-    # - name: Downloading -Calico- Manifest file
-    #   get_url:
-    #     url: https://docs.projectcalico.org/manifests/calico.yaml
-    #     dest: /home/ubuntu/calico-k3s.yaml
-    #     mode: '0644'
-
-    # - name: Configure Calico to use 10.243.0.0 POD Network - Step 1
-    #   lineinfile: 
-    #     dest: /home/ubuntu/calico-k3s.yaml
-    #     regexp: 'CALICO_IPV4POOL_CIDR' 
-    #     line: '            - name: CALICO_IPV4POOL_CIDR'
-    #     backrefs: yes
-
-    # - name: Configure Calico to use 10.243.0.0 POD Network - Step 2
-    #   lineinfile: 
-    #     dest: /home/ubuntu/calico-k3s.yaml
-    #     regexp: '192.168.0.0/16' 
-    #     line: '              value: "10.243.0.0/16"'
-    #     backrefs: yes
-
-    # - name: Apply Calico Overlay Networking Configuration
+    # - name: Installing -k3s-
     #   become: true
     #   become_user: ubuntu
-    #   command: /bin/bash -c "export KUBECONFIG=/home/ubuntu/.kube/config-k3s ; kubectl apply -f ~/calico-k3s.yaml"
+    #   command: /bin/bash -c 'curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--cluster-cidr=10.243.0.0/16 --disable-network-policy --disable=traefik" sh -'
+    #   args: 
+    #      chdir: /home/ubuntu/
 
-    # ## Configuring CALICO for BGP with BIG-IP
-    # - name: Creating /etc/calico directory
+    # - name: Creating .kube directory for ubuntu
     #   file:
-    #     path: /etc/calico
+    #     path: /home/ubuntu/.kube
     #     state: directory
+    #     owner: ubuntu
+    #     group: ubuntu
 
-    # - name: Downloading calicoctl executable installation file 
-    #   get_url:
-    #     url: https://github.com/projectcalico/calicoctl/releases/download/v3.17.1/calicoctl
-    #     dest: /usr/local/bin
-    #     mode: '0755'
- 
-    # - name: Copy calico configuration files  
+    # - name: Creating config-k3s file for ubuntu to access k3s on infra
+    #   become: true
+    #   become_user: ubuntu
+    #   command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config"
+
+    # - name: Creating config-k3s file for ubuntu to access k3s on infra
+    #   become: true
+    #   become_user: ubuntu
+    #   command: /bin/bash -c "sudo cat /etc/rancher/k3s/k3s.yaml > ~/.kube/config-k3s"
+
+    # - name: Copy k3s-manifests files  
     #   copy:
-    #     src: k3s-manifests/calico-overlay/{{ item }}
-    #     dest: /etc/calico/
-    #   with_items:
-    #     - calicoctl-k3s.cfg
-    #     - bgpConfiguration-k3s.yaml
-
-    # - name: Copying BIGIP BGP Peer configuration file
-    #   template:
-    #     src: bigipPeerConfiguration-k3s.yaml.j2
-    #     dest: /etc/calico/bigipPeerConfiguration-k3s.yaml
-
-    # - name: Configuring Calico BGP on k3s cluster
-    #   become: yes
-    #   become_user: ubuntu
-    #   command: calicoctl create -c /etc/calico/calicoctl-k3s.cfg  -f /etc/calico/bgpConfiguration-k3s.yaml
-
-    # - name: Adding BGIP bigip-security as a BGPPeer
-    #   become: yes
-    #   become_user: ubuntu
-    #   command: calicoctl create -c /etc/calico/calicoctl-k3s.cfg -f /etc/calico/bigipPeerConfiguration-k3s.yaml
-
-    - name: Copy k3s-manifests files  
-      copy:
-        src: k3s-manifests
-        dest: /home/ubuntu
-        owner: ubuntu
-        group: ubuntu
+    #     src: k3s-manifests
+    #     dest: /home/ubuntu
+    #     owner: ubuntu
+    #     group: ubuntu
 
     ## NFS-SERVER Configuration
     - name: Creating directory for NFS-Server

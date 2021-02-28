@@ -1,5 +1,5 @@
 [infra_server]
-infra-server ansible_host=10.160.20.20 telegraf_ip=10.160.20.20 hostname=az-infra-server
+infra-server ansible_host=10.160.1.20 telegraf_ip=10.160.1.20 hostname=az-infra-server
 
 [infra_server:vars]
 ansible_python_interpreter=/usr/bin/python3
