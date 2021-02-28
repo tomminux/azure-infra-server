@@ -1,0 +1,85 @@
+## ----------------------------------------------------------------------------
+## ..:: infra-server installation ::..
+## ----------------------------------------------------------------------------
+
+- hosts: infra-server
+  remote_user: root
+  tasks:
+
+    - name: Set timezone to Europe/Rome
+      timezone:
+        name: Europe/Rome
+
+    - name: Upgrading all packages to the latest version
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Copy hosts file
+      copy:
+        src: hosts
+        dest: /etc/hosts
+
+    - name: Installing needed software
+      apt:
+        pkg:
+        - dnsmasq
+
+    - name: Starting dnsmasq
+      service:
+        name: dnsmasq
+        state: started
+
+    - name: Enabling dnsmasq at boot
+      service:
+        name: dnsmasq
+        enabled: yes
+
+    - name: Stopping systemd-resolved 
+      service:
+        name: systemd-resolved
+        state: stopped
+
+    - name: Diabling systemd-resolved at boot
+      service:
+        name: systemd-resolved
+        enabled: no
+
+    - name: Remove resolv.conf link
+      file:
+        path: /etc/resolv.conf
+        state: absent
+
+    - name: Copy resolv.conf file
+      copy:
+        src: resolv.conf
+        dest: /etc/resolv.conf
+
+    # - name: Enable rc.local
+    #   template:
+    #     src: rc.local.j2
+    #     dest: /etc/rc.local
+    #     mode: '0755'
+
+    # - name: Executing /etc/rc.local
+    #   command: /etc/rc.local
+
+    - name: Copy aliasrc.sh file to /home/ubuntu/.aliasrc
+      copy:
+        src: aliasrc.sh
+        dest: /home/ubuntu/.aliasrc
+
+    - name: Source Kubernetes aliases in .bashrc
+      ansible.builtin.lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: source /home/ubuntu/.aliasrc
+
+    - name: Reboot nginx-plus and wait for it to restart
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
+
