@@ -1,7 +1,7 @@
 # Usage
 
 ## ..:: azure-infra-server ::..
-Bash scripts and Ansible playbook to automate the creation of a Linux Ubuntu Server ini Azure VNET to manage Kubernetes cluster (vanilla and/or AKS) with kubectl and k9s and to host a private docker registry running in a docker container.
+Bash scripts and Ansible playbook to automate the creation of a Linux Ubuntu Server in Azure VNET to manage Kubernetes clusters (vanilla and/or AKS) with kubectl and k9s and to host a private docker registry running in a docker container.
 
 Connect to az-infra-server with user "ubuntu"
 
